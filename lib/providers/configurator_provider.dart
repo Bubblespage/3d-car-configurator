@@ -399,7 +399,7 @@ final availableCarsCatalog = [
   CarModel(
     id: 'mclaren_720s_spider',
     name: '2019 McLaren 720S Spider',
-    modelGlbPath: 'models/mclaren_spider.glb',
+    modelGlbPath: 'models/mclaren_720s_spider.glb',
     basePrice: 315000,
     trims: [
       const TrimOption(

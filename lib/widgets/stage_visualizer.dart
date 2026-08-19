@@ -21,73 +21,104 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
       case 'Rear':
         return '180deg 75deg auto';
       case 'Interior':
-        return '0deg 90deg 30%';
+        return '0deg 90deg 10%';
       case 'Front 3/4':
       default:
         return '45deg 75deg auto';
     }
   }
 
-  String _buildColorScript(Color color, String finish) {
-    final r = (color.red / 255).toStringAsFixed(3);
-    final g = (color.green / 255).toStringAsFixed(3);
-    final b = (color.blue / 255).toStringAsFixed(3);
+  String _buildShaderScript(Color paintColor, String finish, Color interiorColor) {
+    final pr = (paintColor.red / 255.0).toStringAsFixed(4);
+    final pg = (paintColor.green / 255.0).toStringAsFixed(4);
+    final pb = (paintColor.blue / 255.0).toStringAsFixed(4);
 
-    // Calculate PBR values based on finish
+    final ir = (interiorColor.red / 255.0).toStringAsFixed(4);
+    final ig = (interiorColor.green / 255.0).toStringAsFixed(4);
+    final ib = (interiorColor.blue / 255.0).toStringAsFixed(4);
+
     final double roughness =
-        finish == 'Matte' ? 0.85 : (finish == 'Metallic' ? 0.20 : 0.08);
+        finish == 'Matte' ? 0.85 : (finish == 'Metallic' ? 0.18 : 0.08);
     final double metallic =
-        finish == 'Matte' ? 0.10 : (finish == 'Metallic' ? 0.95 : 0.40);
+        finish == 'Matte' ? 0.05 : (finish == 'Metallic' ? 0.95 : 0.35);
 
     return '''
       (() => {
-        const viewer = document.querySelector('model-viewer');
-        if (!viewer || !viewer.model) return;
-        const materials = viewer.model.materials;
-        if (!materials || materials.length === 0) return;
+        const updateCarAppearance = () => {
+          const viewer = document.querySelector('model-viewer');
+          if (!viewer || !viewer.model || !viewer.model.materials) return false;
 
-        // 1. Look for targeted body paint material keywords
-        let bodyMaterials = materials.filter(m => {
-          const n = (m.name || '').toLowerCase();
-          return n.includes('body') || 
-                 n.includes('paint') || 
-                 n.includes('car') || 
-                 n.includes('exterior') || 
-                 n.includes('roma') || 
-                 n.includes('shell') || 
-                 n.includes('color') ||
-                 n.includes('metal');
-        });
+          const materials = viewer.model.materials;
+          console.log('[3D Configurator] Detected Materials:', materials.map(m => m.name));
 
-        // 2. Fallback: Apply to non-glass/tire/interior materials
-        if (bodyMaterials.length === 0) {
-          bodyMaterials = materials.filter(m => {
-            const n = (m.name || '').toLowerCase();
-            return !n.includes('glass') && 
-                   !n.includes('tire') && 
-                   !n.includes('wheel') && 
-                   !n.includes('rim') && 
-                   !n.includes('light') &&
-                   !n.includes('interior');
-          });
-        }
+          const isGlass = n => /glass|window|windshield|lens|headlight|taillight|light|lamp|transparent/.test(n);
+          const isWheelOrTire = n => /tire|tyre|wheel|rim|spoke|rubber|caliper|brake|rotor|disc/.test(n);
+          const isTrimOrCarbon = n => /carbon|badge|logo|emblem|grille|gril|exhaust|plate|license|chrome|dark_trim|black_trim|shadow|undercarriage|mirror_black/.test(n);
+          const isInterior = n => /interior|seat|leather|cockpit|upholstery|cabin|cushion|chair|alcantara|cuoio|merino|stitch|steering|dashboard|carpet|floor|door_inner/.test(n);
+          const isExplicitPaint = n => /paint|body|carpaint|car_paint|exterior|chassis|shell|coat|lacquer|kuzov|carrosserie|primary|main_color/.test(n);
 
-        bodyMaterials.forEach(m => {
-          if (m.pbrMetallicRoughness) {
-            m.pbrMetallicRoughness.setBaseColorFactor([$r, $g, $b, 1.0]);
-            m.pbrMetallicRoughness.setRoughnessFactor($roughness);
-            m.pbrMetallicRoughness.setMetallicFactor($metallic);
+          function applyPBR(mat, r, g, b, rough, metal) {
+            if (!mat || !mat.pbrMetallicRoughness) return;
+            const pbr = mat.pbrMetallicRoughness;
+
+            try {
+              if (pbr.baseColorTexture && typeof pbr.baseColorTexture.setTexture === 'function') {
+                pbr.baseColorTexture.setTexture(null);
+              }
+            } catch(e) {}
+
+            try {
+              pbr.setBaseColorFactor([r, g, b, 1.0]);
+              pbr.setRoughnessFactor(rough);
+              pbr.setMetallicFactor(metal);
+            } catch(e) {
+              console.warn('[3D Configurator] Failed applying PBR to ' + mat.name, e);
+            }
           }
-        });
+
+          // 1. Update Exterior Body Paint
+          let bodyMats = materials.filter(m => {
+            const n = (m.name || '').toLowerCase();
+            return isExplicitPaint(n) && !isGlass(n) && !isWheelOrTire(n) && !isInterior(n);
+          });
+
+          // Fallback: If no explicit 'body/paint' named material, target all non-mechanical/non-glass parts
+          if (bodyMats.length === 0) {
+            bodyMats = materials.filter(m => {
+              const n = (m.name || '').toLowerCase();
+              return !isGlass(n) && !isWheelOrTire(n) && !isTrimOrCarbon(n) && !isInterior(n);
+            });
+          }
+
+          bodyMats.forEach(m => applyPBR(m, $pr, $pg, $pb, $roughness, $metallic));
+
+          // 2. Update Interior Cabin Upholstery
+          let interiorMats = materials.filter(m => {
+            const n = (m.name || '').toLowerCase();
+            return isInterior(n);
+          });
+
+          interiorMats.forEach(m => applyPBR(m, $ir, $ig, $ib, 0.85, 0.05));
+
+          return true;
+        };
+
+        const viewer = document.querySelector('model-viewer');
+        if (viewer) {
+          if (!updateCarAppearance()) {
+            viewer.addEventListener('load', updateCarAppearance, { once: true });
+          }
+        }
       })();
     ''';
   }
 
   void _applyMaterialUpdate(ConfiguratorState state) {
     if (_webViewController != null) {
-      final script = _buildColorScript(
+      final script = _buildShaderScript(
         Color(state.selectedPaint.colorHex),
         state.selectedFinish,
+        Color(state.selectedInterior.colorHex),
       );
       try {
         _webViewController.runJavaScript(script);
@@ -102,10 +133,11 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
     final state = ref.watch(configuratorProvider);
     final notifier = ref.read(configuratorProvider.notifier);
 
-    // Watch for color/finish updates and apply instantly
+    // Trigger instant shader repaints when Paint, Finish, Interior, or Car changes
     ref.listen<ConfiguratorState>(configuratorProvider, (previous, next) {
       if (previous?.selectedPaint != next.selectedPaint ||
           previous?.selectedFinish != next.selectedFinish ||
+          previous?.selectedInterior != next.selectedInterior ||
           previous?.selectedCar != next.selectedCar) {
         _applyMaterialUpdate(next);
       }
@@ -123,7 +155,7 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 1. Glowing Turntable Ring
+          // 1. Illuminated Turntable Glow
           Align(
             alignment: const Alignment(0.0, 0.22),
             child: IgnorePointer(
@@ -153,8 +185,7 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
               ),
             ),
           ),
-
-          // 2. 3D Model Viewer (Reloads when switching car models)
+          // 2. 3D Model Viewer
           ModelViewer(
             key: ValueKey(state.selectedCar.id),
             src: state.selectedCar.modelGlbPath,
@@ -169,13 +200,15 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
             loading: Loading.eager,
             onWebViewCreated: (controller) {
               _webViewController = controller;
-              Future.delayed(const Duration(milliseconds: 600), () {
-                _applyMaterialUpdate(state);
-              });
+              // Progressive retries to apply materials as GLB finishes streaming
+              for (final delayMs in [200, 600, 1200, 2500]) {
+                Future.delayed(Duration(milliseconds: delayMs), () {
+                  if (mounted) _applyMaterialUpdate(state);
+                });
+              }
             },
           ),
-
-          // 3. Camera View Switcher (Top Left)
+          // 3. Camera View Switcher
           Positioned(
             top: 0,
             left: 0,
@@ -227,8 +260,7 @@ class _StageVisualizerState extends ConsumerState<StageVisualizer> {
               ),
             ),
           ),
-
-          // 4. Performance Specs HUD (Top Right)
+          // 4. Performance Specs Telemetry HUD
           Positioned(
             top: 0,
             right: 0,
