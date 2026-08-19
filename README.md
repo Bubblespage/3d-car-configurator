@@ -1,16 +1,15 @@
-# sports_car_configurator
+🏎️ Apex GT | 3D Car Configurator
 
-A new Flutter project.
+An interactive sports car configurator built with Flutter, featuring real-time vehicle customization, dynamic pricing calculations, and interactive camera viewpoints.
 
-## Getting Started
+✨ Features
 
-This project is a starting point for a Flutter application.
+-3D Vehicle Viewport: Interactive model display with camera angle presets (Front 3/4, Side, Rear, Interior).
+-Real-Time Customization: Live paint color switching (Rosso Corsa, Nero Daytona, Blu Tour de France, Grigio Silverstone), wheel selection, and interior trims.
+-Dynamic Pricing Engine: Instant calculations for Total MSRP and estimated monthly finance rates based on chosen options.
+-Performance Metric Cards: Live spec readouts including 0–60 mph, horsepower, and top speed.
 
-A few resources to get you started if this is your first Flutter project:
+🛠️ Tech Stack
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+-Framework: Flutter / Dart
+-Target Platforms: Web, Desktop, Mobile
