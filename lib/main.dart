@@ -8,7 +8,7 @@ void main() {
 
 class SportsCarConfiguratorApp extends StatelessWidget {
   const SportsCarConfiguratorApp({super.key});
-
+ 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
